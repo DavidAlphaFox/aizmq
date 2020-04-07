@@ -71,7 +71,7 @@ handle_call(recv_multipart, From, State) ->
 
 handle_call(unblock, From, State) ->
     unblock(From, State);
-
+%% start a binder to accept new client
 handle_call({bind, tcp, Host, Port}, _From, State) ->
     Reply = chumak_bind:start_link(Host, Port), %% start a bind
     {reply, Reply, State};
@@ -116,6 +116,7 @@ handle_info({queue_ready, Identity, From}, State) ->
 
 %% When the client is crashed we should not exit 
 %% and we should let the implementaion of type to deal with this
+%% And this may be the information from bind when the socket is binded.
 handle_info({'EXIT', PeerPid, _Other}, State) ->
     exit_peer(PeerPid, State);
 
@@ -265,7 +266,7 @@ validate_keys([Key | T], Acc) when is_list(Key) ->
             validate_keys(T, [Binary | Acc])
     catch
         _:_ ->
-            {error, "Failed to decode Z85 key"}
+        {error, "Failed to decode Z85 key"}
     end;
 validate_keys([Key | T], Acc) when is_binary(Key) ->
     validate_keys(T, [Key | Acc]);

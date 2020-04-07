@@ -50,7 +50,8 @@ accept_peer(State, PeerPid) ->
 
 peer_ready(State, _PeerPid, _Identity) ->
     {noreply, State}.
-
+%% We have to remeber the last peer we have process
+%% REP server is process request one by one
 send(#chumak_rep{last_recv_peer=nil}=State, _Data, _From) ->
     {reply, {error, efsm}, State};
 
@@ -62,8 +63,7 @@ send(#chumak_rep{last_recv_peer=LastRecvPeer}=State, Data, _From)
 
 recv(#chumak_rep{state=idle, lb=LB}=State, From) ->
     case chumak_lb:get(LB) of
-        none ->
-            {noreply, State#chumak_rep{state=wait_req, pending_recv={from, From}}};
+        none -> {noreply, State#chumak_rep{state=wait_req, pending_recv={from, From}}};
         {NewLB, PeerPid} ->
             direct_recv(State#chumak_rep{lb=NewLB}, PeerPid, PeerPid, From)
     end;
@@ -133,23 +133,20 @@ direct_recv(#chumak_rep{lb=LB}=State, FirstPeerPid, PeerPid, From) ->
     end.
 
 recv_from_peer(PeerPid) ->
-    case chumak_peer:incoming_queue_out(PeerPid) of
-        {out, Messages} ->
-            decode_messages(Messages);
-        empty ->
-            empty;
-        {error,Info}->
-            error_logger:info_msg("can't get message out in ~p with reason: ~p~n",[chumak_rep,Info]),
-            empty
-    end.
+  case chumak_peer:incoming_queue_out(PeerPid) of
+    {out, Messages} -> decode_messages(Messages);
+    empty -> empty;
+    {error,Info}->
+      error_logger:info_msg("can't get message out in ~p with reason: ~p~n",[chumak_rep,Info]),
+      empty
+  end.
 
-decode_messages([<<>>|Tail])->
-    {ok, binary:list_to_bin(Tail)};
+decode_messages([<<>>|Tail])-> {ok, binary:list_to_bin(Tail)};
 decode_messages([Delimiter|_Tail]) ->
-    error_logger:warning_report({
-                                  invalid_delimiter_frame,
-                                  {pattern, rep},
-                                  {obtained_frame, Delimiter},
-                                  {expected_frame, <<>>}
-                                }),
-    {error, invalid_delimiter_frame}.
+  error_logger:warning_report({
+                               invalid_delimiter_frame,
+                               {pattern, rep},
+                               {obtained_frame, Delimiter},
+                               {expected_frame, <<>>}
+                              }),
+  {error, invalid_delimiter_frame}.

@@ -146,12 +146,12 @@ handle_call(incoming_queue_out, _From, #state{incoming_queue=nil}=State) ->
                               ]),
     {reply, {error, incoming_queue_not_enabled}, State};
 handle_call(incoming_queue_out, _From, #state{incoming_queue=IncomingQueue}=State) ->
-    case queue:out(IncomingQueue) of
-        {{value, Messages}, NewQueue} ->
-            {reply, {out, Messages}, State#state{incoming_queue=NewQueue}};
-        {empty, _IncomingQueue} ->
-            {reply, empty, State}
-    end.
+  case queue:out(IncomingQueue) of
+    {{value, Messages}, NewQueue} ->
+      {reply, {out, Messages}, State#state{incoming_queue=NewQueue}};
+    {empty, _IncomingQueue} ->
+      {reply, empty, State}
+  end.
 
 
 %% @hidden
@@ -214,73 +214,70 @@ handle_cast(reconnect, #state{socket=Socket}=State) ->
 
 %% @hidden
 handle_info({tcp, _Port, Frame}, State) ->
-    ok = inet:setopts(State#state.socket, [{active, once}]),
-    Reply = chumak_protocol:decode(State#state.decoder, Frame),
-    process_decoder_reply(State, Reply);
+  ok = inet:setopts(State#state.socket, [{active, once}]),
+  Reply = chumak_protocol:decode(State#state.decoder, Frame),
+  process_decoder_reply(State, Reply);
 
 
 handle_info({tcp_closed, _Port}, #state{host=nil}=State) ->
-    %% when not support reconnect
-    {stop, {shutdown, tcp_closed}, State};
+  %% when not support reconnect
+  {stop, {shutdown, tcp_closed}, State};
 
 handle_info({tcp_closed, _Port}, State) ->
-    try_connect(State);
+  try_connect(State);
 
 handle_info(InfoMessage, State) ->
-    error_logger:info_report([
-                              unhandled_handle_info,
-                              {msg, InfoMessage}
-                             ]),
-    {noreply, State}.
+  error_logger:info_report([
+                            unhandled_handle_info,
+                            {msg, InfoMessage}
+                           ]),
+  {noreply, State}.
 
 
 %% @hidden
-terminate(_Reason, #state{socket=nil}) ->
-    ok;
+terminate(_Reason, #state{socket=nil}) -> ok;
 terminate(_Reason, #state{socket=Socket}) ->
-    gen_tcp:close(Socket),
-    ok.
+  catch gen_tcp:close(Socket),
+  ok.
 
 %% private methods
 send_data(Data, #state{socket = Socket} = State) ->
-    case gen_tcp:send(Socket, Data) of
-        ok ->
-            ok;
-        {error, Reason}->
-            error_logger:warning_report([
-                                         send_error,
-                                         {error, Reason}
-                                        ])
-    end,
-    {noreply, State}.
+  case gen_tcp:send(Socket, Data) of
+    ok -> ok;
+    {error, Reason}->
+      error_logger:warning_report([
+                                   send_error,
+                                   {error, Reason}
+                                  ])
+  end,
+  {noreply, State}.
 
 try_connect(#state{host=Host, port=Port, parent_pid=ParentPid, 
                    socket=OldSocketPid, security_data = CurveOptions}=State) ->
-    case gen_tcp:connect(Host, Port, ?SOCKET_OPTS([])) of 
-        {ok, SocketPid} -> 
-            case OldSocketPid of
-                nil ->
-                    pass;
-                _ ->
-                    gen_server:cast(ParentPid, {peer_reconnected, self()}) %% tell chumak_socket we are connected
-            end,
+  case gen_tcp:connect(Host, Port, ?SOCKET_OPTS([])) of
+    {ok, SocketPid} ->
+      case OldSocketPid of
+        nil -> pass;
+        _ ->
+          gen_server:cast(ParentPid, {peer_reconnected, self()}) %% tell chumak_socket we are connected
+      end,
             %% update state and start to decode the protocol
-            NewState = State#state{
-                         socket=SocketPid,
-                         decoder=chumak_protocol:new_decoder(CurveOptions)
-                        },
-            negotiate_greetings(NewState);
+      NewState = State#state{
+                   socket=SocketPid,
+                   decoder=chumak_protocol:new_decoder(CurveOptions)
+                  },
+      negotiate_greetings(NewState);
 
-        {error, Reason} ->
-            error_logger:error_report([
-                                       {host, Host},
-                                       {port, Port},
-                                       connection_error,
-                                       {error, Reason}
-                                      ]),
-            timer:sleep(?RECONNECT_TIMEOUT),
-            try_connect(State)
-    end.
+    {error, Reason} ->
+      error_logger:error_report([
+                                 {host, Host},
+                                 {port, Port},
+                                 connection_error,
+                                 {error, Reason}
+                                ]),
+      timer:sleep(?RECONNECT_TIMEOUT),
+      try_connect(State)
+  end.
 
 %% the result must be either:
 %% {noreply, NewState#state{decoder=NewDecoder, step=ready}};
@@ -531,16 +528,16 @@ recv_ready_command(Socket) ->
 
 process_decoder_reply(State, Reply) ->
     case Reply of
-        {ok, Decoder} ->
-            {noreply, State#state{decoder=Decoder}};
-        {ok, Decoder, Commands} ->
-            receive_commands(State, Decoder, Commands);
-        {error, Reason} ->
-            error_logger:error_report([
-                                       decode_fail,
-                                       {reason, Reason}
-                                      ]),
-            {stop, decode_error, State}
+      {ok, Decoder} ->
+        {noreply, State#state{decoder=Decoder}};
+      {ok, Decoder, Commands} ->
+        receive_commands(State, Decoder, Commands);
+      {error, Reason} ->
+        error_logger:error_report([
+                                   decode_fail,
+                                   {reason, Reason}
+                                  ]),
+        {stop, decode_error, State}
     end.
 
 
@@ -555,34 +552,34 @@ send_greetting_step(Socket, AsServer, Mechanism) ->
 
 
 receive_commands(#state{step=ready}=State, NewDecoder, []) ->
-    {noreply, State#state{decoder=NewDecoder}};
+  {noreply, State#state{decoder=NewDecoder}};
 
 receive_commands(#state{step=ready, parent_pid=ParentPid}=State, NewDecoder, [Command|Commands]) ->
-    case chumak_command:command_name(Command) of
-        message ->
-            NewState = deliver_message(State, Command),
-            receive_commands(NewState, NewDecoder, Commands);
+  case chumak_command:command_name(Command) of
+    message ->
+      NewState = deliver_message(State, Command),
+      receive_commands(NewState, NewDecoder, Commands);
 
-        subscribe ->
-            Subscription = chumak_command:subscribe_subscription(Command),
-            gen_server:cast(ParentPid, {peer_subscribe, self(), Subscription}),
-            receive_commands(State, NewDecoder, Commands);
+    subscribe ->
+      Subscription = chumak_command:subscribe_subscription(Command),
+      gen_server:cast(ParentPid, {peer_subscribe, self(), Subscription}),
+      receive_commands(State, NewDecoder, Commands);
 
-        cancel ->
-            Subscription = chumak_command:cancel_subscription(Command),
-            gen_server:cast(ParentPid, {peer_cancel_subscribe, self(), Subscription}),
-            receive_commands(State, NewDecoder, Commands);
+    cancel ->
+      Subscription = chumak_command:cancel_subscription(Command),
+      gen_server:cast(ParentPid, {peer_cancel_subscribe, self(), Subscription}),
+      receive_commands(State, NewDecoder, Commands);
 
-        error ->
-            error_logger:error_report([
-                                       socket_error,
-                                       {reason, chumak_command:error_reason(Command)}
-                                      ]),
-            {stop, {shutdown, peer_error}, State};
+    error ->
+      error_logger:error_report([
+                                 socket_error,
+                                 {reason, chumak_command:error_reason(Command)}
+                                ]),
+      {stop, {shutdown, peer_error}, State};
 
-        Name ->
-            {stop, {invalid_command, Name}}
-    end.
+    Name ->
+      {stop, {invalid_command, Name}}
+  end.
 
 send_invalid_socket_type_error(Socket, SocketType, PeerSocketType) ->
     ReasonMsg = io_lib:format("Invalid socket-type ~s for ~p server",
@@ -609,35 +606,32 @@ send_command_to_socket(Socket, Command) ->
     gen_tcp:send(Socket, chumak_protocol:encode_command(Command)).
 
 deliver_message(#state{peer_version={3, 0}, pub_compatible_layer=true, parent_pid=ParentPid}=State, Message) ->
-    Data = chumak_protocol:message_data(Message),
+  Data = chumak_protocol:message_data(Message),
 
-    case Data of
-        <<1, SubscribeTopic/binary>> ->
-            gen_server:cast(ParentPid, {peer_subscribe, self(), SubscribeTopic});
-        <<0, UnsubscribeTopic/binary>> ->
-            gen_server:cast(ParentPid, {peer_cancel_subscribe, self(), UnsubscribeTopic})
-    end,
-
-    State;
+  case Data of
+    <<1, SubscribeTopic/binary>> ->
+      gen_server:cast(ParentPid, {peer_subscribe, self(), SubscribeTopic});
+    <<0, UnsubscribeTopic/binary>> ->
+      gen_server:cast(ParentPid, {peer_cancel_subscribe, self(), UnsubscribeTopic})
+  end,
+  State;
 
 deliver_message(#state{incoming_queue=nil, parent_pid=ParentPid}=State, Message) ->
-    %% deliver message directly to parent pid without buffering
-    ParentPid ! {peer_recv_message, Message, self()},
-    State;
+  %% deliver message directly to parent pid without buffering
+  ParentPid ! {peer_recv_message, Message, self()},
+  State;
 
 deliver_message(State, Message) ->
-    #state{incoming_queue=IncomingQueue, msg_buf=Buffer,
-           parent_pid=ParentPid, peer_identity=PeerIdentity} = State,
+  #state{incoming_queue=IncomingQueue, msg_buf=Buffer,
+         parent_pid=ParentPid, peer_identity=PeerIdentity} = State,
 
-    NewBuffer = Buffer ++ [chumak_protocol:message_data(Message)],
+  NewBuffer = Buffer ++ [chumak_protocol:message_data(Message)],
 
-    case chumak_protocol:message_has_more(Message) of
-        %% if need to accumulate more message
-        true ->
-            State#state{msg_buf=NewBuffer};
-
-        false ->
-            NewQueue = queue:in(NewBuffer, IncomingQueue),
-            ParentPid ! {queue_ready, PeerIdentity, self()},
-            State#state{msg_buf=[], incoming_queue=NewQueue}
-    end.
+  case chumak_protocol:message_has_more(Message) of
+    %% if need to accumulate more message
+    true -> State#state{msg_buf=NewBuffer};
+    false ->
+      NewQueue = queue:in(NewBuffer, IncomingQueue),
+      ParentPid ! {queue_ready, PeerIdentity, self()},
+      State#state{msg_buf=[], incoming_queue=NewQueue}
+  end.

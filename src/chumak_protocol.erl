@@ -453,7 +453,7 @@ build_message(Message, _, SecurityData) ->
 %% @doc new_decoder creates a new decoder waiting for greeting message
 -spec new_decoder(SecurityData::decoder_security_data()) -> NewDecoder::decoder().
 new_decoder(SecurityData) ->
-    #decoder{security_data = SecurityData}.
+  #decoder{security_data = SecurityData}.
 
 
 %% @doc decode reads incoming frame and generate an updated decoder
@@ -461,35 +461,32 @@ new_decoder(SecurityData) ->
 %% waiting the command, its first for performance reasons
 decode(#decoder{state=ready}=Decoder, Frame) ->
     <<Flag:1/binary, _/binary>> = Frame,
+    NextState =
+    case Flag of
+      %% if bit 2 is enabled then is a traffic for a command
+      <<_:5, 1:1, _:1, _:1>> -> command_ready;
 
-    NextState = case Flag of
-                    %% if bit 2 is enabled then is a traffic for a command
-                    <<_:5, 1:1, _:1, _:1>> ->
-                        command_ready;
-
-                    %% if bit 2 is disabled then is a traffic for a message
-                    <<_:5, 0:1, _:1, _:1>> ->
-                        message_ready
-                end,
+      %% if bit 2 is disabled then is a traffic for a message
+      <<_:5, 0:1, _:1, _:1>> -> message_ready
+    end,
     case Frame of
-        %% if bit 1 is disabled then is a small frame
-        <<_:5, _:1, 0:1, _:1, Size, _RemaingFrame/binary>> ->
-            require_size(Decoder, Size+2, Frame, NextState);
+      %% if bit 1 is disabled then is a small frame
+      <<_:5, _:1, 0:1, _:1, Size, _RemaingFrame/binary>> ->
+        require_size(Decoder, Size+2, Frame, NextState);
 
-        %% if bit 1 is enabled then is a large frame
-        <<_:5, _:1, 1:1, _:1, Size:64, _RemaingFrame/binary>> ->
-            require_size(Decoder, Size+9, Frame, NextState);
+      %% if bit 1 is enabled then is a large frame
+      <<_:5, _:1, 1:1, _:1, Size:64, _RemaingFrame/binary>> ->
+        require_size(Decoder, Size+9, Frame, NextState);
 
-        %% if size is remaing for small frame
-        <<_:5, _:1, 0:1, _:1>> ->
-            require_size(Decoder, 2, Frame, ready);
+      %% if size is remaing for small frame
+      <<_:5, _:1, 0:1, _:1>> ->
+        require_size(Decoder, 2, Frame, ready);
 
         %% if size is remaing for large frame
-        <<_:5, _:1, 1:1, _:1, _TooShortToBeSize/binary>> ->
-            require_size(Decoder, 9, Frame, ready);
-
-        X ->
-            {error, {bad_ready_packet, X}}
+      <<_:5, _:1, 1:1, _:1, _TooShortToBeSize/binary>> ->
+        require_size(Decoder, 9, Frame, ready);
+      X ->
+        {error, {bad_ready_packet, X}}
     end;
 
 %% waiting the command to be buffered
@@ -695,13 +692,11 @@ encode_last_message(Message, Mechanism, SecurityData)
 
 %% @doc Return data for a message
 -spec message_data(Message::message()) -> Frame::binary().
-message_data(#message{frame=Data}) ->
-    Data.
+message_data(#message{frame=Data}) -> Data.
 
 %% @doc Return if message has the flag marked to receive more messages
 -spec message_has_more(Message::message()) -> true | false.
-message_has_more(#message{has_more=HasMore}) ->
-    HasMore.
+message_has_more(#message{has_more=HasMore}) -> HasMore.
 
 %%
 %% Private API
